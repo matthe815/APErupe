@@ -1,5 +1,5 @@
 {
-  "Host": "35.133.219.2",
+  "Host": "192.168.1.1",
   "BinPath": "bin",
   "Language": "en",
   "DisableSoftCrash": false,
@@ -188,7 +188,7 @@
     "Host": "localhost",
     "Port": 5432,
     "User": "postgres",
-    "Password": "admin",
+    "Password": "",
     "Database": "erupe"
   },
   "Sign": {
