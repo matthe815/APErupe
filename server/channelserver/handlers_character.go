@@ -118,7 +118,7 @@ func getPointers() map[SavePointer]int {
 }
 
 func GetCharacterSaveData(s *Session, charID uint32) (*CharacterSaveData, error) {
-	result, err := s.server.db.Query("SELECT id, savedata, is_new_character, name FROM characters WHERE id = $1", charID)
+	result, err := s.server.db.Query("SELECT id, savedata, is_new_character, name FROM characters WHERE id = $1 AND seed = $2", charID, s.server.Archipelago.Seed)
 	if err != nil {
 		s.logger.Error("Failed to get savedata", zap.Error(err), zap.Uint32("charID", charID))
 		return nil, err

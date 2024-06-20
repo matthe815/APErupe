@@ -313,13 +313,27 @@ func handleMsgSysRecordLog(s *Session, p mhfpacket.MHFPacket) {
 		for i := 0; i < 176; i++ {
 			val = bf.ReadUint8()
 			if val > 0 && mhfmon.Monsters[i].Large {
-				s.server.db.Exec(`INSERT INTO kill_logs (character_id, monster, quantity, timestamp) VALUES ($1, $2, $3, $4)`, s.charID, i, val, TimeAdjusted())
+				s.server.db.Exec(`INSERT INTO kill_logs (character_id, monster, quantity, timestamp, quest_id) VALUES ($1, $2, $3, $4, $5)`, s.charID, i, val, TimeAdjusted(), s.lastQuest)
+				processQuestClear(s)
 			}
 		}
 	}
 	// remove a client returning to town from reserved slots to make sure the stage is hidden from board
 	delete(s.stage.reservedClientSlots, s.charID)
 	doAckSimpleSucceed(s, pkt.AckHandle, make([]byte, 4))
+}
+
+func processQuestClear(s *Session) {
+	// TODO; Process check code
+	fmt.Println("Sent check")
+	var data byteframe.ByteFrame
+	data.WriteUint8(1)
+	data.WriteUint8(5)
+	data.WriteBytes([]byte(s.lastQuest))
+	_, err := s.server.Archipelago.Connector.Write(data.Data())
+	if err != nil {
+		return
+	}
 }
 
 func handleMsgSysEcho(s *Session, p mhfpacket.MHFPacket) {}

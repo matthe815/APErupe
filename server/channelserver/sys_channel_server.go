@@ -18,6 +18,21 @@ import (
 	"go.uber.org/zap"
 )
 
+type ReceivedItem struct {
+	ItemId    uint16
+	Player    string
+	Offset    uint8
+	ItemIndex uint16
+}
+
+type ArchipelagoConnector struct {
+	Connector     net.Conn
+	ReceivedItems []ReceivedItem
+	DB            *sqlx.DB
+	Index         int
+	Seed          string
+}
+
 // Config struct allows configuring the server.
 type Config struct {
 	ID          uint16
@@ -44,6 +59,7 @@ type Server struct {
 	IP             string
 	Port           uint16
 	logger         *zap.Logger
+	Archipelago    *ArchipelagoConnector
 	db             *sqlx.DB
 	erupeConfig    *_config.Config
 	acceptConns    chan net.Conn

@@ -27,10 +27,11 @@ func (s *Server) newUserChara(uid uint32) error {
 	_, err = s.db.Exec(`
 		INSERT INTO characters (
 			user_id, is_female, is_new_character, name, unk_desc_string,
-			hr, gr, weapon_type, last_login)
-		VALUES($1, False, True, '', '', 0, 0, 0, $2)`,
+			hr, gr, weapon_type, last_login, seed)
+		VALUES($1, False, True, '', '', 0, 0, 0, $2, $3)`,
 		uid,
 		uint32(time.Now().Unix()),
+		s.Archipelago.Seed,
 	)
 	if err != nil {
 		return err
@@ -71,7 +72,7 @@ type character struct {
 
 func (s *Server) getCharactersForUser(uid uint32) ([]character, error) {
 	characters := make([]character, 0)
-	err := s.db.Select(&characters, "SELECT id, is_female, is_new_character, name, unk_desc_string, hr, gr, weapon_type, last_login FROM characters WHERE user_id = $1 AND deleted = false ORDER BY id", uid)
+	err := s.db.Select(&characters, "SELECT id, is_female, is_new_character, name, unk_desc_string, hr, gr, weapon_type, last_login FROM characters WHERE user_id = $1 AND deleted = false AND seed = $2 ORDER BY id", uid, s.Archipelago.Seed)
 	if err != nil {
 		return nil, err
 	}

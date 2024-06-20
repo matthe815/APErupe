@@ -47,6 +47,7 @@ type Session struct {
 	token            string
 	kqf              []byte
 	kqfOverride      bool
+	lastQuest        string
 
 	semaphore *Semaphore // Required for the stateful MsgSysUnreserveStage packet.
 

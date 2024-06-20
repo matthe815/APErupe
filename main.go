@@ -1,12 +1,18 @@
 package main
 
 import (
+	"encoding/hex"
+	"erupe-ce/common/byteframe"
 	_config "erupe-ce/config"
 	"fmt"
+	"io"
+	"math"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -198,6 +204,25 @@ func main() {
 		logger.Info("API: Disabled")
 	}
 
+	archi := startArchipelago(db)
+	if archi == nil {
+		if config.Sign.Enabled {
+			signServer.Shutdown()
+		}
+
+		if config.API.Enabled {
+			ApiServer.Shutdown()
+		}
+
+		if config.Entrance.Enabled {
+			entranceServer.Shutdown()
+		}
+
+		panic("Couldn't connect to Archipelago Connector.")
+	}
+
+	signServer.Archipelago = archi
+
 	var channels []*channelserver.Server
 
 	if config.Channel.Enabled {
@@ -222,6 +247,7 @@ func main() {
 				}
 				c.Port = ce.Port
 				c.GlobalID = fmt.Sprintf("%02d%02d", j+1, i+1)
+				c.Archipelago = archi
 				err = c.Start()
 				if err != nil {
 					preventClose(fmt.Sprintf("Channel: Failed to start, %s", err.Error()))
@@ -281,12 +307,184 @@ func main() {
 		entranceServer.Shutdown()
 	}
 
+	archi.Connector.Close()
+
 	time.Sleep(1 * time.Second)
 }
 
 func wait() {
 	for {
 		time.Sleep(time.Millisecond * 100)
+	}
+}
+
+func startArchipelago(db *sqlx.DB) *channelserver.ArchipelagoConnector {
+	conn, err := net.Dial("tcp", "localhost:3000")
+	if err != nil {
+		fmt.Println("Failed to connect to Archipelago Connector")
+		return nil
+	}
+
+	archi := &channelserver.ArchipelagoConnector{
+		Connector: conn,
+		DB:        db,
+	}
+
+	go acceptArchiInput(archi)
+	return archi
+}
+
+func acceptArchiInput(archi *channelserver.ArchipelagoConnector) {
+	for {
+		buffer := make([]byte, 100)
+		_, err := archi.Connector.Read(buffer)
+		if err != nil {
+			panic(err)
+		}
+
+		if len(buffer) != 0 {
+			var bf byteframe.ByteFrame
+			bf.WriteBytes(buffer)
+			bf.SetLE()
+			bf.Seek(0, io.SeekStart)
+			fmt.Println(hex.Dump(buffer))
+
+			for bf.Index() < uint(len(buffer)) {
+				pktType := bf.ReadUint8()
+
+				switch pktType {
+				case 0:
+					break
+				case 1:
+					readArchiIndex(bf.ReadBytes(20), archi)
+					fmt.Println("Got seed packet")
+					break
+				case 2:
+					itemIndex := bf.ReadUint16()
+					player := string(bf.ReadNullTerminatedBytes())
+					dataOffset := bf.ReadUint8()
+					itemId := bf.ReadUint16()
+					archi.ReceivedItems = append(archi.ReceivedItems, channelserver.ReceivedItem{ItemId: itemId, Player: player, Offset: dataOffset, ItemIndex: itemIndex})
+					fmt.Println("Recieved " + strconv.Itoa(int(itemIndex)) + " from " + player)
+					break
+				case 3:
+					processReceipts(archi)
+					updateArchiIndex(archi)
+					archi.ReceivedItems = make([]channelserver.ReceivedItem, 0)
+					break
+				}
+			}
+		}
+	}
+}
+
+func readArchiIndex(initialBuffer []byte, archi *channelserver.ArchipelagoConnector) {
+	archi.Seed = string(initialBuffer)
+	row := archi.DB.QueryRowx("SELECT * FROM archi_index WHERE seed=$1", string(initialBuffer))
+
+	var seed string
+	var index uint8
+
+	err := row.Scan(&seed, &index)
+	if err != nil {
+		fmt.Println("new game")
+	}
+
+	archi.Index = int(index)
+}
+
+func updateArchiIndex(archi *channelserver.ArchipelagoConnector) {
+	archi.DB.Exec("DELETE FROM archi_index WHERE seed=$1", archi.Seed)
+	archi.DB.Exec("INSERT INTO archi_index(seed, index) VALUES($1, $2)", archi.Seed, archi.Index)
+}
+
+func processReceipts(archi *channelserver.ArchipelagoConnector) {
+	if len(archi.ReceivedItems) == 0 || len(archi.ReceivedItems) < archi.Index {
+		return
+	}
+
+	processQueue := archi.ReceivedItems[archi.Index:]
+	fmt.Println(len(processQueue))
+	for _, value := range processQueue {
+		switch value.ItemIndex {
+		case 45000:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 1 Urgent Ticket"), "000107000004B10000000100000000", archi.Seed)
+			break
+		case 45001:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 2 Urgent Ticket"), "000107000004B20000000100000000", archi.Seed)
+			break
+		case 45002:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 3 Urgent Ticket"), "000107000004B30000000100000000", archi.Seed)
+			break
+		case 45003:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 4 Urgent Ticket"), "000107000004B40000000100000000", archi.Seed)
+			break
+		case 45004:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 5 Urgent Ticket"), "000107000004B50000000100000000", archi.Seed)
+			break
+		case 45005:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 6 Urgent Ticket"), "000107000004B60000000100000000", archi.Seed)
+			break
+		case 45006:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "1 HR 7 Urgent Ticket"), "000107000004B70000000100000000", archi.Seed)
+			break
+		case 45007:
+			_, err := archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "50000G Zenny"), "00010A000000000000138800000000", archi.Seed)
+			if err != nil {
+				panic(err)
+			}
+			break
+		case 45008:
+			var bf byteframe.ByteFrame
+			hexData, _ := hex.DecodeString("000107000000010000000100000000")
+			bf.SetLE()
+			bf.WriteBytes(hexData)
+			bf.Seek(5, io.SeekStart)
+			bf.WriteUint16(value.ItemId)
+			bf.Seek(10, io.SeekStart)
+			randomQuant := math.Floor(rand.Float64() * 99)
+			bf.WriteInt16(int16(randomQuant))
+			_, err := archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, $4, $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like\nto offer you %s", value.Player, "a Random Item"), bf.Data(), archi.Seed)
+			if err != nil {
+				panic(err)
+			}
+			break
+		case 45009: // random weapon
+			var bf byteframe.ByteFrame
+			hexData, _ := hex.DecodeString("000107000000010000000100000000")
+			bf.SetLE()
+			bf.WriteBytes(hexData)
+			bf.Seek(2, io.SeekStart)
+			bf.WriteUint8(value.Offset)
+			bf.Seek(5, io.SeekStart)
+			bf.WriteUint16(value.ItemId)
+			_, err := archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, $4, $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like\nto offer you %s", value.Player, "a Random Weapon"), bf.Data(), archi.Seed)
+			if err != nil {
+				panic(err)
+			}
+			break
+		case 45010: // random armor
+			var bf byteframe.ByteFrame
+			hexData, _ := hex.DecodeString("000107000000010000000100000000")
+			bf.SetLE()
+			bf.WriteBytes(hexData)
+			bf.Seek(2, io.SeekStart)
+			bf.WriteUint8(value.Offset)
+			bf.Seek(5, io.SeekStart)
+			bf.WriteUint16(value.ItemId)
+			_, err := archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, $4, $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like\nto offer you %s", value.Player, "a Random Armor"), bf.Data(), archi.Seed)
+			if err != nil {
+				panic(err)
+			}
+			break
+		case 45012:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "200 N-Points"), "00011100000000000000C800000000", archi.Seed)
+			break
+		case 45013:
+			archi.DB.Exec("INSERT INTO distribution(type, event_name, description, data, seed) VALUES($1, $2, $3, DECODE($4, 'hex'), $5)", 1, fmt.Sprintf("Gift From the %s Guild", value.Player), fmt.Sprintf("We at the %s Guild would like to\noffer you %s", value.Player, "10 GCP Tickets"), "000107000027C30000000A00000000", archi.Seed)
+			break
+		}
+		archi.Index++
 	}
 }
 

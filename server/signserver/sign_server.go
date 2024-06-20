@@ -1,6 +1,7 @@
 package signserver
 
 import (
+	"erupe-ce/server/channelserver"
 	"fmt"
 	"io"
 	"net"
@@ -28,6 +29,7 @@ type Server struct {
 	db             *sqlx.DB
 	listener       net.Listener
 	isShuttingDown bool
+	Archipelago    *channelserver.ArchipelagoConnector
 }
 
 // NewServer creates a new Server type.

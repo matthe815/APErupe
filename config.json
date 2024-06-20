@@ -1,5 +1,5 @@
 {
-  "Host": "127.0.0.1",
+  "Host": "35.133.219.2",
   "BinPath": "bin",
   "Language": "en",
   "DisableSoftCrash": false,
@@ -41,7 +41,7 @@
     "FestaOverride": -1,
     "TournamentOverride": 0,
     "DisableTokenCheck": false,
-    "QuestTools": false,
+    "QuestTools": true,
     "AutoQuestBackport": true,
     "ProxyPort": 0,
     "CapLink": {
@@ -52,8 +52,8 @@
     }
   },
   "GameplayOptions": {
-    "MinFeatureWeapons": 0,
-    "MaxFeatureWeapons": 1,
+    "MinFeatureWeapons": 11,
+    "MaxFeatureWeapons": 13,
     "MaximumNP": 100000,
     "MaximumRP": 50000,
     "MaximumFP": 120000,
@@ -85,12 +85,12 @@
     "ZennyMultiplierNC": 1.00,
     "GZennyMultiplier": 1.00,
     "GZennyMultiplierNC": 1.00,
-    "MaterialMultiplier": 1.00,
-    "MaterialMultiplierNC": 1.00,
+    "MaterialMultiplier": 7.00,
+    "MaterialMultiplierNC": 5.00,
     "GMaterialMultiplier": 1.00,
     "GMaterialMultiplierNC": 1.00,
-    "ExtraCarves": 0,
-    "ExtraCarvesNC": 0,
+    "ExtraCarves": 4,
+    "ExtraCarvesNC": 2,
     "GExtraCarves": 0,
     "GExtraCarvesNC": 0,
     "DisableHunterNavi": false,
@@ -188,7 +188,7 @@
     "Host": "localhost",
     "Port": 5432,
     "User": "postgres",
-    "Password": "",
+    "Password": "admin",
     "Database": "erupe"
   },
   "Sign": {

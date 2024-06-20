@@ -1,0 +1,20 @@
+Progression Items:
+HR Rank
+G-Zenny
+Quest Lists
+Quest Tickets
+
+Normal Items:
+Zenny
+GZenny
+
+Useful Items
+Items
+Weapons
+Armors
+Full Heal
+
+Traps:
+1 HP trap
+25 stamina trap
+Faint trap

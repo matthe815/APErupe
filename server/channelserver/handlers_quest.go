@@ -133,6 +133,8 @@ func handleMsgSysGetFile(s *Session, p mhfpacket.MHFPacket) {
 		if _config.ErupeConfig.RealClientMode <= _config.Z1 && s.server.erupeConfig.DebugOptions.AutoQuestBackport {
 			data = BackportQuest(decryption.UnpackSimple(data))
 		}
+
+		s.lastQuest = pkt.Filename[:5]
 		doAckBufSucceed(s, pkt.AckHandle, data)
 	}
 }
