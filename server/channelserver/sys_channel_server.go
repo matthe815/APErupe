@@ -22,12 +22,13 @@ type ReceivedItem struct {
 	ItemId    uint16
 	Player    string
 	Offset    uint8
-	ItemIndex uint16
+	ItemIndex uint32
 }
 
 type ArchipelagoConnector struct {
 	Connector     net.Conn
 	ReceivedItems []ReceivedItem
+	Channels      []*Server
 	DB            *sqlx.DB
 	Index         int
 	Seed          string
